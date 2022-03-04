@@ -1,29 +1,39 @@
-"""Provide the primary functions."""
+from .hessian import Hessian
 
 
-def canvas(with_attribution=True):
+def hesmatch(ref_hessian, match_hessians, masses=None, ref_format='2d', match_format='2d',
+             ref_unit=1, match_unit=1):
     """
-    Placeholder function to show example docstring (NumPy format).
-
-    Replace this function and doc string for your own project.
 
     Parameters
     ----------
-    with_attribution : bool, Optional, default: True
-        Set whether or not to display who the quote is from.
+    ref_hessian : TYPE
+        DESCRIPTION.
+    match_hessians : TYPE
+        DESCRIPTION.
+    masses : TYPE, optional
+        DESCRIPTION. The default is None.
+    ref_format : TYPE, optional
+        DESCRIPTION. The default is '2d'.
+    match_format : TYPE, optional
+        DESCRIPTION. The default is '2d'.
+    ref_unit : TYPE, optional
+        DESCRIPTION. The default is 1.
+    match_unit : TYPE, optional
+        DESCRIPTION. The default is 1.
 
     Returns
     -------
-    quote : str
-        Compiled string including quote and optional attribution.
+    None.
+
     """
 
-    quote = "The code is but a canvas to our imagination."
-    if with_attribution:
-        quote += "\n\t- Adapted from Henry David Thoreau"
-    return quote
+    ref = Hessian(ref_hessian, ref_format, ref_unit, masses)
+    matches = [Hessian(match_hessian, match_format, match_unit, masses) for match_hessian in
+               match_hessians]
 
-
-if __name__ == "__main__":
-    # Do something if this file is invoked on its own
-    print(canvas())
+    for i, hes in enumerate([ref]+matches):
+        print(f'\n\n\n\nHESSIAN NUMBER: {i+1}\n')
+        print('natoms', hes.n_atoms)
+        print('\neigval', hes.eigval)
+        print('\neigvec', hes.eigvec)
