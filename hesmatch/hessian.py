@@ -1,6 +1,6 @@
 import numpy as np
 from scipy.linalg import eigh
-from ase.units import Hartree, mol, kJ, Bohr, nm
+from ase.units import Hartree, mol, kJ, Bohr, nm, J, m, kg, _Nav, _c
 
 
 class Hessian():
@@ -92,14 +92,9 @@ class Hessian():
             Eigenvectors, which are the vibrational modes
         """
 
-        # Need to switch these units to ase.units
-        const_amu = 1.6605389210e-27
-        const_avogadro = 6.0221412900e+23
-        const_speedoflight = 299792.458
-        kj2j = 1e3
-        ang2meter = 1e-10
-        to_omega2 = kj2j/ang2meter**2/(const_avogadro*const_amu)  # 1/s**2
-        to_waveno = 1e-5/(2.0*np.pi*const_speedoflight)  # cm-1
+        to_omega2 = kJ/J * m**2 * kg/_Nav  # convert kJ mol-1 Ang-2 Da-1 to s-2
+        m_to_cm = 1e2
+        to_waveno = 1 / (2.0 * np.pi * _c * m_to_cm)  # convert s-1 to cm-1
 
         val, vec = eigh(self.matrix)
         vec = np.reshape(np.transpose(vec), (3*self.n_atoms, self.n_atoms, 3))[6:]
