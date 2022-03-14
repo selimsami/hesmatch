@@ -46,8 +46,15 @@ setup(
     # Comment out this line to prevent the files from being packaged with your software
     include_package_data=True,
 
+    install_requires=[
+        'numpy',
+        'scipy',
+        'ase',
+        'pycolt'
+    ],
+
     # Allows `setup.py test` to work correctly with pytest
-    setup_requires=['pycolt'] + pytest_runner,
+    setup_requires= pytest_runner,
 
     # Additional entries you may want simply uncomment the lines you want and fill in the data
     # url='http://www.my_package.com',  # Website
