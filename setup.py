@@ -46,13 +46,6 @@ setup(
     # Comment out this line to prevent the files from being packaged with your software
     include_package_data=True,
 
-    install_requires=[
-        'numpy',
-        'scipy',
-        'ase',
-        'pycolt'
-    ],
-
     # Allows `setup.py test` to work correctly with pytest
     setup_requires= pytest_runner,
 
