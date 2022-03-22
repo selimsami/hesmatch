@@ -1,108 +1,124 @@
+from typing import Sequence, Union
+from numbers import Real
 import numpy as np
-from scipy.linalg import eigh
-from ase.units import Hartree, mol, kJ, Bohr, nm, J, m, kg, _Nav, _c
+from ase.vibrations import VibrationsData
+from ase import Atoms
 
 
-class Hessian():
-    def __init__(self, hessian, hes_format, hes_unit, masses):
-        self.masses = masses
+class VibrationsData(VibrationsData):
 
-        if hes_format == 'upper':
-            self.n_atoms = int((np.sqrt(8*hessian.size+1)-1)/6)
-            self.matrix = self.from_upper_to_matrix(hessian)
-        elif hes_format == 'lower':
-            self.n_atoms = int((np.sqrt(8*hessian.size+1)-1)/6)
-            self.matrix = self.from_lower_to_matrix(hessian)
-        else:
-            self.n_atoms = int(np.sqrt(hessian.size)/3)
-            self.matrix = hessian
+    @classmethod
+    def from_lower_triangle(cls, atoms: Atoms,
+                hessian_lower_triangle: Union[Sequence[Sequence[Real]], np.ndarray],
+                indices: Sequence[int] = None) -> 'VibrationsData':
+        """Instantiate VibrationsData when the Hessian is given as the
+        lower triangle of the matrix in ((3N)**2+3N)/2 format
 
-        if hes_unit == 2:  # kJ mol-1 nm-2 to kJ mol-1 A-2
-            self.matrix /= nm**2
-        elif hes_unit == 3:  # Hartree Bohr-2 to kJ mol-1 A-2
-            self.matrix *= Hartree * mol / kJ / Bohr**2
+        Args:
+            atoms: Equilibrium geometry of vibrating system
 
-        if np.any(masses):
-            self.matrix = self.mass_weigh()
+            hessian: Second-derivative in energy with respect to
+                Cartesian nuclear movements as a ((3N)**2+3N)/2 array.
 
-        self.eigval, self.eigvec = self.diagonalize()
+            indices: Indices of (non-frozen) atoms included in Hessian
 
-    def from_upper_to_matrix(self, upper):
         """
-        Parameters
-        ----------
-        upper : 1D Numpy array
-            Hessian matrix in upper triangle format
+        if indices is None:
+            indices = range(len(atoms))
+        assert indices is not None  # Show Mypy that indices is now a sequence
 
-        Returns
-        -------
-        matrix : 2D Numpy array
-            Hessian matrix as a (3n, 3n) 2D matrix
-        """
-        matrix = np.zeros((3*self.n_atoms, 3*self.n_atoms))
+        hessian_lower_triangle_array = np.asarray(hessian_lower_triangle)
+        n_atoms = cls._check_dimensions(atoms, hessian_lower_triangle_array,
+                                        indices=indices, triangle=True)
+
+        hessian_2d_array = np.zeros((3*n_atoms, 3*n_atoms))
+
         count = 0
-        for i in range(3*self.n_atoms):
-            for j in range(i, 3*self.n_atoms):
-                matrix[i, j] = upper[count]
-                matrix[j, i] = matrix[i, j]
-                count += 1
-        return matrix
-
-    def from_lower_to_matrix(self, lower):
-        """
-        Parameters
-        ----------
-        lower : 1D Numpy array
-            Hessian matrix in lower triangle format
-
-        Returns
-        -------
-        matrix : 2D Numpy array
-            Hessian matrix as a (3n, 3n) 2D matrix
-
-        """
-        matrix = np.zeros((3*self.n_atoms, 3*self.n_atoms))
-        count = 0
-        for i in range(3*self.n_atoms):
+        for i in range(3*n_atoms):
             for j in range(i+1):
-                matrix[i, j] = lower[count]
-                matrix[j, i] = matrix[i, j]
+                hessian_2d_array[i, j] = hessian_lower_triangle_array[count]
+                hessian_2d_array[j, i] = hessian_2d_array[i, j]
                 count += 1
-        return matrix
 
-    def mass_weigh(self):
+        return cls(atoms, hessian_2d_array.reshape(n_atoms, 3, n_atoms, 3),
+                   indices=indices)
+
+    @classmethod
+    def from_upper_triangle(cls, atoms: Atoms,
+                hessian_upper_triangle: Union[Sequence[Sequence[Real]], np.ndarray],
+                indices: Sequence[int] = None) -> 'VibrationsData':
+        """Instantiate VibrationsData when the Hessian is given as the
+        upper triangle of the matrix in ((3N)**2+3N)/2 format
+
+        Args:
+            atoms: Equilibrium geometry of vibrating system
+
+            hessian: Second-derivative in energy with respect to
+                Cartesian nuclear movements as a ((3N)**2+3N)/2 array.
+
+            indices: Indices of (non-frozen) atoms included in Hessian
+
         """
-        Returns
-        -------
-        2D Numpy array (3n, 3n)
-            Mass-weighted 2D Hessian matrix
+        if indices is None:
+            indices = range(len(atoms))
+        assert indices is not None  # Show Mypy that indices is now a sequence
+
+        hessian_upper_triangle_array = np.asarray(hessian_upper_triangle)
+        n_atoms = cls._check_dimensions(atoms, hessian_upper_triangle_array,
+                                        indices=indices, triangle=True)
+
+        hessian_2d_array = np.zeros((3*n_atoms, 3*n_atoms))
+
+        count = 0
+        for i in range(3*n_atoms):
+            for j in range(i, 3*n_atoms):
+                hessian_2d_array[i, j] = hessian_upper_triangle_array[count]
+                hessian_2d_array[j, i] = hessian_2d_array[i, j]
+                count += 1
+
+        return cls(atoms, hessian_2d_array.reshape(n_atoms, 3, n_atoms, 3),
+                   indices=indices)
+
+    @staticmethod
+    def _check_dimensions(atoms: Atoms,
+                          hessian: np.ndarray,
+                          indices: Sequence[int],
+                          two_d: bool = False,
+                          triangle: bool = False) -> int:
+        """Sanity check on array shapes from input data
+
+        Args:
+            atoms: Structure
+            indices: Indices of atoms used in Hessian
+            hessian: Proposed Hessian array
+            two_d: Whether the Hessian is in 2D format
+            triangle: Whether the Hessian is in 1D triangle format
+
+        Returns:
+            Number of atoms contributing to Hessian
+
+        Raises:
+            ValueError if Hessian dimensions does not match the reference shape
+
         """
-        mass_sq = self.masses * self.masses[:, np.newaxis]
-        mass_sq = np.repeat(mass_sq, 3, axis=0)
-        mass_sq = np.repeat(mass_sq, 3, axis=1)
-        return self.matrix/np.sqrt(mass_sq)
 
-    def diagonalize(self):
-        """
-        Returns
-        -------
-        freq : 1D Numpy array
-            Eigenvalues, which are the vibrational frequencies (cm-1)
-        vec : 3D Numpy array (3n-6, n, 3)
-            Eigenvectors, which are the vibrational modes
-        """
+        n_atoms = len(atoms[indices])
 
-        to_omega2 = kJ/J * m**2 * kg/_Nav  # convert kJ mol-1 Ang-2 Da-1 to s-2
-        m_to_cm = 1e2
-        to_waveno = 1 / (2.0 * np.pi * _c * m_to_cm)  # convert s-1 to cm-1
+        if two_d:
+            ref_shape = [n_atoms * 3, n_atoms * 3]
+            ref_shape_txt = '{n:d}x{n:d}'.format(n=(n_atoms * 3))
 
-        val, vec = eigh(self.matrix)
-        vec = np.reshape(np.transpose(vec), (3*self.n_atoms, self.n_atoms, 3))[6:]
+        elif triangle:
+            ref_shape = [((n_atoms*3)**2+n_atoms*3)/2]
+            ref_shape_txt = '{n:d}'.format(n=int(((n_atoms*3)**2+n_atoms*3)/2))
 
-        if np.any(self.masses):
-            for i in range(self.n_atoms):
-                vec[:, i, :] = vec[:, i, :] / np.sqrt(self.masses[i])
+        else:
+            ref_shape = [n_atoms, 3, n_atoms, 3]
+            ref_shape_txt = '{n:d}x3x{n:d}x3'.format(n=n_atoms)
 
-        # For linear molecules 5: ? Is the clipping necessary?
-        freq = np.sqrt(val.clip(min=0)[6:] * to_omega2) * to_waveno
-        return freq, vec
+        if (isinstance(hessian, np.ndarray)
+            and hessian.shape == tuple(ref_shape)):
+            return n_atoms
+        else:
+            raise ValueError("Hessian for these atoms should be a "
+                             "{} numpy array.".format(ref_shape_txt))
