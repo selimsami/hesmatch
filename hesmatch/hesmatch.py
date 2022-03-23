@@ -1,8 +1,8 @@
 from ase import Atoms
 import numpy as np
-from .hessian import VibrationsData
 from ase.units import Hartree, mol, kJ, Bohr, nm
-
+from .hessian import VibrationsData
+from .matching import matcher
 
 def hesmatch(ref_hessian, match_hessians, masses=None, ref_format='2d', match_format='2d',
              ref_unit=1, match_unit=1):
@@ -36,11 +36,7 @@ def hesmatch(ref_hessian, match_hessians, masses=None, ref_format='2d', match_fo
     matches = [do_vibrational_analysis(match_hessian, match_format, match_unit, masses)
                for match_hessian in match_hessians]
 
-    for i, hes in enumerate([ref]+matches):
-        print(f'\n\n\n\nHESSIAN NUMBER: {i+1}\n')
-        print('\neigval', hes.get_frequencies())
-        print()
-        print(hes.get_modes())
+    matcher(ref, matches)
 
 
 def do_vibrational_analysis(hessian, hes_format, unit, masses):
